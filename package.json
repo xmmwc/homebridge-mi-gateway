@@ -11,7 +11,8 @@
     "debug": "^4.3.4",
     "node-fetch": "^2.6.11",
     "querystring": "^0.2.1",
-    "randomstring": "^1.3.0"
+    "randomstring": "^1.3.0",
+    "telnet-client": "^2.0.8"
   },
   "devDependencies": {
     "@types/chai": "^4.3.5",
