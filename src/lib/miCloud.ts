@@ -1,11 +1,15 @@
-import * as randomString from 'randomstring'
 import * as crypto from 'crypto'
-import queryString from 'querystring'
 import fetch from 'node-fetch'
-import { logger } from './logger'
+import queryString from 'querystring'
+import * as randomString from 'randomstring'
 import { CryptRc4 } from '../util/cryptRc4'
+import { logger } from './logger'
 
-export type MiCloudCountry = 'ru' | 'us' | 'tw' | 'sg' | 'cn' | 'de' | 'in' | 'i2'
+export const AVAILABLE_COUNTRIES = ['ru', 'us', 'tw', 'sg', 'cn', 'de', 'in', 'i2'] as const
+export type ArrayElement<T> = T extends readonly [...(infer RE)]
+    ? RE[number]
+    : never
+export type MiCloudCountry = ArrayElement<typeof AVAILABLE_COUNTRIES>
 
 export interface MiCloudDevice {
     did: string
@@ -40,6 +44,18 @@ export interface MiCloudDevice {
     prop?: Record<string, string | number>
 }
 
+export interface MiCloudRoom {
+    id: string
+    name: string
+    bssid: string
+    parentid: string
+    dids: string[]
+    icon: string
+    background: string
+    shareflag: string
+    create_time: string
+}
+
 const DEFAULT_REQUEST_TIMEOUT = 5000
 
 export class MiCloud {
@@ -50,7 +66,6 @@ export class MiCloud {
     serviceToken: string | null = null
 
     private requestTimeout = DEFAULT_REQUEST_TIMEOUT
-    private availableCountries: MiCloudCountry[] = ['ru', 'us', 'tw', 'sg', 'cn', 'de', 'in', 'i2']
     protected country: MiCloudCountry = 'cn'
 
     locale = 'en'
@@ -71,8 +86,8 @@ export class MiCloud {
     }
 
     setCountry (country: MiCloudCountry) {
-        if (!this.availableCountries.includes(country)) {
-            throw new Error(`The country ${country} is not supported, list of supported countries is ${this.availableCountries.join(', ')}`)
+        if (!AVAILABLE_COUNTRIES.includes(country)) {
+            throw new Error(`The country ${country} is not supported, list of supported countries is ${AVAILABLE_COUNTRIES.join(', ')}`)
         }
         this.country = country
     }
@@ -111,8 +126,31 @@ export class MiCloud {
             get_split_device: false,
             support_smart_home: true
         }
-        const data = await this.request('/home/device_list', params)
+        const data = await this.request<{
+            result: {
+                list: MiCloudDevice[]
+            }
+        }>('/v2/home/device_list', params)
         return data.result.list
+    }
+
+    async getRooms (): Promise<MiCloudRoom[]> {
+        const params = {
+            fg: true,
+            fetch_share: true,
+            limit: 300
+        }
+        const data = await this.request<{
+            result: {
+                homelist: [{
+                    roomlist: MiCloudRoom[]
+                }]
+            }
+        }>('/v2/homeroom/gethome', params)
+        return data.result.homelist.reduce<MiCloudRoom[]>((total, home) => {
+            total.push(...home.roomlist)
+            return total
+        }, [])
     }
 
     private parseJson<T = object> (data: string): T {
@@ -299,7 +337,7 @@ export class MiCloud {
         return decipher.decode(payload)
     }
 
-    private async request (path: string, data: object) {
+    private async request<T = any> (path: string, data: object): Promise<T> {
         if (!this.isLoggedIn) {
             throw new Error('You are not logged in')
         }

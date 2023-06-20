@@ -17,6 +17,7 @@
         "esModuleInterop": true,
         "preserveConstEnums": true,
         "skipLibCheck": true,
+        "resolveJsonModule": true,
         "useUnknownInCatchVariables": false
     },
     "include": [
